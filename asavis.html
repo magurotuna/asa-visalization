@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>D3 Test</title>
+        <script src="./lib/d3.js" charset="utf-8"></script>
+        <script src="./lib/topojson.js" charset="utf-8"></script>
+        <script src="./japan_population.json" charset="utf-8"></script>
+    </head>
+<body>
+<script type="text/javascript">
+
+var width = 800;
+var height = 800;
+// var color = d3.scaleLinear().domain([500000, 13000000]).range([255, 0]);
+// var color = d3.scaleLinear().domain([Math.floor(minhash(populationGrowthHash)), Math.ceil(maxhash(populationGrowthHash))]).range([255, 0]);
+var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+var populationHash = {};
+var populationGrowthHash = {};
+
+JapanPopulationData.Data.forEach(function(d)
+{
+  populationHash[d.Prefecture] = d.Population_2010;
+});
+
+JapanPopulationData.Data.forEach(function(d)
+{
+  populationGrowthHash[d.Prefecture] = 100 * (d.Population_2010 - d.Population_2000) / d.Population_2000;
+})
+
+function maxhash(hasharray) {
+  var max = 0;
+  for(var i in hasharray) {
+    if(max < hasharray[i]) max = hasharray[i];
+  }
+  return max;
+}
+
+function minhash(hasharray) {
+  var min = 0;
+  for(var i in hasharray) {
+    if(min > hasharray[i]) min = hasharray[i];
+  }
+  return min;
+}
+
+var maxGrowthRate_over_three = maxhash(populationGrowthHash) / 3;
+var minGrowthRate_over_three = minhash(populationGrowthHash) / 3;
+
+var hashColor = {down1: '#e34a33',
+                 down2: '#fdbb84',
+                 down3: '#fee8c8',
+                 up1: '#2b8cbe',
+                 up2: '#a6bddb',
+                 up3: '#ece7f2'};
+
+function quantitizeColor (pref) {
+  if(populationGrowthHash[pref] >= 2 * maxGrowthRate_over_three) return hashColor['up1'];
+  else if(populationGrowthHash[pref] >= maxGrowthRate_over_three) return hashColor['up2'];
+  else if(populationGrowthHash[pref] >= 0) return hashColor['up3'];
+  else if(populationGrowthHash[pref] >= minGrowthRate_over_three) return hashColor['down3'];
+  else if(populationGrowthHash[pref] >= 2 * minGrowthRate_over_three) return hashColor['down2'];
+  else return hashColor['down1'];
+}
+
+// var color = d3.scaleLinear().domain([Math.floor(minhash(populationGrowthHash)), Math.ceil(maxhash(populationGrowthHash))]).range([255, 0]);
+
+d3.json("./lib/japan.topojson", function(data) {
+  var japan = topojson.feature(data, data.objects.japan);
+  var projection = d3.geoMercator()
+                     .center([137, 34]) //lat and long
+                     .translate([width/2, height/2])
+                     .scale(1500);
+
+  var path = d3.geoPath().projection(projection);
+
+  svg.selectAll("path")
+     .data(japan.features)
+     .enter()
+     .append("path")
+     .attr("d", path)
+     .attr("fill", function(d) {
+      //  console.log(quantitizeColor(d.properties.nam_ja));
+       return quantitizeColor(d.properties.nam_ja);
+     })
+     .attr("stroke", "#333333")
+     .attr("stroke-width", 0.5)
+     .on("mouseover", function(d){ showDetails(d.properties.nam_ja); });
+
+  var pref_details = svg.append("text")
+                        .attr("x", 50)
+                        .attr("y", 50)
+                        .attr("font-size", 24)
+                        .attr("stroke", "none")
+                        .attr("fill", "black");
+
+  function showDetails(pref)
+  {
+    pref_details.text(pref + ": " + populationGrowthHash[pref] + "%");
+  }
+
+});
+
+
+</script>
+</body></html>
